@@ -11,7 +11,7 @@ sem_t c;
 sem_t d;
 sem_t e;
 
-void* processA(void* arg)
+void* processA(void*)
 {
         srand(getpid());
         sem_wait(&a);
