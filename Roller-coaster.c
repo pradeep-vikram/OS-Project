@@ -71,7 +71,7 @@ void* passengerThread()
 		pthread_mutex_lock(&in_car);
 		boarded++;
 		printf("%d passengers have boarded the car...\n", boarded);
-	    sleep(rand()%2);
+	    sleep(std::clamp(current, 0, 10));
 		if (boarded == capacity)
 		{
 			sem_post(&all_boarded);
@@ -101,7 +101,6 @@ int main()
 
 	pthread_t passenger[TOTAL_PEOPLE];
 	pthread_t car;
-	int i;
 
 	printf("WELCOME TO ROLLER COASTER RIDE.... \n\n");
 	pthread_mutex_init(&in_car, NULL);
@@ -116,7 +115,7 @@ int main()
 
 
 	pthread_create(&car, NULL, carThread, NULL);
-	for(i = 0; i < TOTAL_PEOPLE; i++)
+	for(int i = 0; i < TOTAL_PEOPLE; i++)
 	{
 	    pthread_create(&passenger[i], NULL, passengerThread, NULL);
 	}
