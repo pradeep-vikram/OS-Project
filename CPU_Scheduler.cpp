@@ -4,21 +4,28 @@
 #include <stdlib.h>
 #include <fstream>
 #include<limits>
+#include <vector>
 
 using namespace std;
 
 // Global variables to hold the arrival,burst time,priority
 // and average waiting time and turnaround time
 
-int p_count,quant,round_count = 0;
-int arr_time[20];
-int burst_time[20];
-int priority[20];
-float avg_wt[20];
-int avg_wt_count;
-float avg_tt[20];
+int p_count = 0;
+int quant = 0;
+int round_count = 0;
 
-void swap(int *a, int *b)
+vector<float> arr_time(20, 0.0f);
+vector<float> burst_time(20, 0.0f);
+vector<float> avg_wt(20, 0.0f);
+vector<float> avg_tt(20, 0.0f);
+vector<float> priority(20, 0.0f);
+
+
+int avg_wt_count = {};
+
+
+void swap(int *a, int *b) noexcept
 {
 	int temp = *a;
 	*a = *b;
@@ -57,93 +64,85 @@ int * FCFS()
 
     avg_wt[avg_wt_count]=(float)total_wt / (float)p_count;
 
-    return(wt1);
+    return wt1;
 }
 
 // A function to calculate waiting time in SJF Algorithm
-int * SJF()
-{
-    avg_wt_count++;
-    int mat[10][6];
-    static int wt2[20];
-    for(int i=0; i<p_count; i++)
-	{
-		mat[i][0] = i+1;
-		mat[i][1] = arr_time[i];
-		mat[i][2] = burst_time[i];
-	}
+struct Process {
+    int id;
+    int arrivalTime;
+    int burstTime;
+    int completionTime;
+    int waitingTime;
+    int turnaroundTime;
+};
 
-	//Arrange By arrival time
-    for(int i=0; i<p_count; i++)
-	{
-		for(int j=0; j<p_count-i-1; j++)
-		{
-			if(mat[j][1] > mat[j+1][1])
-			{
-				for(int k=0; k<5; k++)
-				{
-					swap(mat[j][k], mat[j+1][k]);
-				}
-			}
-		}
-	}
+void swapProcesses(Process& a, Process& b) {
+    Process temp = a;
+    a = b;
+    b = temp;
+}
 
-	//Calculating completion time
-    int temp, val;
-	mat[0][3] = mat[0][1] + mat[0][2];
-	mat[0][5] = mat[0][3] - mat[0][1];
-	mat[0][4] = mat[0][5] - mat[0][2];
-
-	for(int i=1; i<p_count; i++)
-	{
-		temp = mat[i-1][3];
-		int low = mat[i][2];
-		for(int j=i; j<p_count; j++)
-		{
-			if(temp >= mat[j][1] && low >= mat[j][2])
-			{
-				low = mat[j][2];
-				val = j;
-			}
-		}
-		mat[val][3] = temp + mat[val][2];
-		mat[val][5] = mat[val][3] - mat[val][1];
-		mat[val][4] = mat[val][5] - mat[val][2];
-		for(int k=0; k<6; k++)
-		{
-			swap(mat[val][k], mat[i][k]);
-		}
-	}
-
-	//Re-ording the matrix by process number
-    for(int i=0;i<p_count;i++)
-	{
-	    for(int j=i+1;j<p_count;j++)
-        {
-            if(mat[i][0] > mat[j][0])
-            {
-                for(int k=0; k<6; k++)
-				{
-					swap(mat[i][k], mat[j][k]);
-				}
-
+void sortByArrivalTime(Process processes[], int p_count) {
+    for(int i = 0; i < p_count; i++) {
+        for(int j = 0; j < p_count - i - 1; j++) {
+            if(processes[j].arrivalTime > processes[j+1].arrivalTime) {
+                swapProcesses(processes[j], processes[j+1]);
             }
         }
-	}
-
-	for(int i=0;i<p_count;i++)
-    {
-        wt2[i] = mat[i][4];
     }
+}
+
+void scheduleProcesses(Process processes[], int p_count) {
+    processes[0].completionTime = processes[0].arrivalTime + processes[0].burstTime;
+    processes[0].turnaroundTime = processes[0].completionTime - processes[0].arrivalTime;
+    processes[0].waitingTime = processes[0].turnaroundTime - processes[0].burstTime;
+
+    for(int i = 1; i < p_count; i++) {
+        int temp = processes[i-1].completionTime;
+        int lowestBurstTime = processes[i].burstTime;
+        int lowestIndex = i;
+
+        for(int j = i; j < p_count; j++) {
+            if(temp >= processes[j].arrivalTime && lowestBurstTime >= processes[j].burstTime) {
+                lowestBurstTime = processes[j].burstTime;
+                lowestIndex = j;
+            }
+        }
+
+        processes[lowestIndex].completionTime = temp + processes[lowestIndex].burstTime;
+        processes[lowestIndex].turnaroundTime = processes[lowestIndex].completionTime - processes[lowestIndex].arrivalTime;
+        processes[lowestIndex].waitingTime = processes[lowestIndex].turnaroundTime - processes[lowestIndex].burstTime;
+
+        swapProcesses(processes[lowestIndex], processes[i]);
+    }
+}
+
+void calculateWaitingTimes(Process processes[], int wt2[], int p_count) {
     int total_wt = 0;
-    for(int i=0;i<p_count;i++)
-    {
+    for(int i = 0; i < p_count; i++) {
+        wt2[i] = processes[i].waitingTime;
         total_wt += wt2[i];
     }
-    avg_wt[avg_wt_count] = float(total_wt) / float(p_count);
-
-    return(wt2);
+    avg_wt[avg_wt_count] = static_cast<float>(total_wt) / static_cast<float>(p_count);
 }
+
+int * SJF() {
+    avg_wt_count++;
+    Process processes[10];
+    static int wt2[20];
+
+    for(int i = 0; i < p_count; i++) {
+        processes[i] = {i+1, arr_time[i], burst_time[i]};
+    }
+
+    sortByArrivalTime(processes, p_count);
+    scheduleProcesses(processes, p_count);
+    calculateWaitingTimes(processes, wt2, p_count);
+
+    return wt2;
+}
+
 
 // A function to calculate waiting time in SRTN Algorithm
 int * SRTN()
@@ -168,7 +167,12 @@ int * SRTN()
         proc[i].art = arr_time[i];
     }
 
-    int rt[p_count];
+    int s = INT_MAX;
+    if (p_count < 0)
+    {
+	s = p_count;
+    }
+    int rt[s];
 
 	// Copy the burst time into rt[]
 	for (int i = 0; i < p_count; i++)
@@ -294,11 +298,9 @@ int * PRIORITY()
     	for(int i=0;i<p_count;i++){
     		if(processes[i].remainingTime > 0){
     			isAllCompleted = false;
-                if(processes[i].arrivalTime <= currentTime){
-                    if(processes[i].priority < currentHighestPriority){
+                if((processes[i].arrivalTime <= currentTime) && (processes[i].priority < currentHighestPriority)){
                         currentHighestPriority = processes[i].priority;
                         currentHighestPriorityIndex = i;
-                    }
                 }
 
     		}
@@ -410,7 +412,7 @@ int * RR()
 }
 
 // Function that prints the waiting time of each process corresponding to time taken in each scheduling algorithm
-void print_wt(int *wt1,int *wt2,int *wt3,int *wt4,int *wt5)
+void print_wt(const int *wt1, const int *wt2, const int *wt3, const int *wt4, const int *wt5)
 {
     cout<<"\n\tRound : "<<round_count<<"\t"<<p_count<<" Processes\tQuantum : "<<quant;
     cout<<"\n\t_____________________________________________";
